@@ -1,0 +1,7 @@
+# Python 3.11-3.13. PyTorch only; TensorFlow is not needed.
+torch==2.8.0
+numpy==2.2.6
+pandas==2.2.3
+scikit-learn==1.7.1
+matplotlib==3.10.5
+joblib==1.5.1

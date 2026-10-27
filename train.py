@@ -13,7 +13,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset, random_split
 import matplotlib.pyplot as plt
 
-from models.lstm_autoencoder import LSTMAutoencoder
+from src.model import LSTMAutoencoder
 
 
 # ─────────────────────────────────────────────
@@ -193,7 +193,7 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     criterion = nn.MSELoss()
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, patience=5, factor=0.5, verbose=True
+        optimizer, patience=5, factor=0.5
     )
 
     # ── Train ──────────────────────────────────

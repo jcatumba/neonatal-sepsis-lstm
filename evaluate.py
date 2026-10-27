@@ -18,7 +18,7 @@ from sklearn.metrics import (
     classification_report, confusion_matrix
 )
 
-from models.lstm_autoencoder import LSTMAutoencoder
+from src.model import LSTMAutoencoder
 
 
 def get_args():

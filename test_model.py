@@ -8,7 +8,7 @@ import numpy as np
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from models.lstm_autoencoder import LSTMAutoencoder, Encoder, Decoder
+from src.model import LSTMAutoencoder, Encoder, Decoder
 
 
 BATCH     = 8
