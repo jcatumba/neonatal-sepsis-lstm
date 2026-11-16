@@ -1,5 +1,8 @@
 # Colab quick start
 
+This guide covers the synthetic sepsis demo. For the PICDB mortality study,
+use the separate [mortality notebook and instructions](README_MORTALITY.md).
+
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Safiya-2026/neonatal-sepsis-lstm/blob/main/colab/neonatal_sepsis_colab.ipynb)
 
 1. Open the notebook. Use a fresh Python 3.11-3.13 runtime.

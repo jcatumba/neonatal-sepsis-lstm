@@ -12,7 +12,31 @@ An unsupervised anomaly detection framework using an **LSTM Autoencoder** traine
 score is not evidence of sepsis; the synthetic demonstration does not establish
 clinical performance.
 
+## NICU mortality in Google Colab
+
+[![Open mortality notebook](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/jcatumba/neonatal-sepsis-lstm/blob/main/colab/mortality_colab.ipynb)
+
+The separate [mortality notebook](colab/mortality_colab.ipynb) uses the
+locally prepared PICDB candidate cohort without a PostgreSQL connection in
+Colab. It trains an LSTM autoencoder on the first 24 hours, then evaluates
+observed-value reconstruction error against in-hospital mortality. The score
+is **not** a calibrated probability or a clinical prediction. This is an
+approximation of the paper, not an exact reproduction.
+
+After local preparation, run `python -m src.mortality_exchange` and upload
+only the resulting minimized NPZ to an approved location. It excludes original
+patient and admission identifiers, but still contains sensitive derived data
+and pseudonymous test-patient group codes. The raw PICDB tables, PostgreSQL,
+credentials and the complete local audit NPZ are not needed in Colab. See
+[mortality Colab instructions](colab/README_MORTALITY.md) and the
+[data review](Data%20and%20code%20review%20and%20preparation.md).
+The notebook and modules must be published to the linked repository before
+the badge can open this version.
+
 ## Run in Google Colab
+
+The following section describes the separate **synthetic sepsis demo**, not
+the PICDB mortality experiment above.
 
 Open the badge above and select **Runtime > Run all** in a fresh Python 3.11-3.13
 runtime. Defaults use explicitly synthetic data and a two-epoch smoke run, with

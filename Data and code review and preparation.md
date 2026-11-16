@@ -295,8 +295,23 @@ The private local NPZ includes patient and admission IDs for split auditing;
 it is under ignored `outputs/` with restricted directory/file permissions.
 All 30 marker/bin observation counts match the independent PostgreSQL coverage
 query; split IDs do not overlap, and focused and existing pipeline tests pass.
-No model has been trained and the current Colab notebook does not load this
-dataset.
+
+The user selected observed-value MSE for training, observed-value MAE for
+scoring, a Youden threshold selected only on validation, deferred risk groups,
+and 95% patient-cluster bootstrap intervals on test. The separate
+[`mortality_colab.ipynb`](./colab/mortality_colab.ipynb) implements this
+protocol. Its encoder is 64/32 and decoder 32/64; by user choice it trains on
+all training admissions, whereas the article describes training primarily on
+survivors. The model score is not a calibrated death probability. Confidence
+intervals condition on the trained model and fixed threshold.
+
+`python -m src.mortality_exchange` creates a minimized, private local NPZ with
+no original patient/admission identifiers. It contains only the prepared
+arrays and labels needed for this experiment, test-patient pseudonymous groups
+and training preprocessing parameters. It remains sensitive derived data.
+The notebook needs this one file, not PostgreSQL or raw PICDB tables. A local
+one-epoch training/validation smoke check and a fully synthetic notebook test
+passed; the real test set has not been scored for this change.
 
 ### Questions for the authors
 
@@ -312,12 +327,11 @@ records or identifiers.
 
 ## Next decision gate
 
-Before interpreting model results, define the autoencoder architecture,
-reconstruction scoring, threshold/risk-cluster rule, and comparator
-definitions. Explicitly document choices that cannot be recovered from the
-paper as deviations rather than claiming exact reproduction. Investigate the
-paper's Table 2 discrepancies, but do not assume they can be resolved without
-the authors' extraction and clarification.
+Before interpreting model results, define comparator models and any
+probability calibration or risk-cluster rules. Explicitly document choices
+that cannot be recovered from the paper as deviations rather than claiming
+exact reproduction. Investigate the paper's Table 2 discrepancies, but do not
+assume they can be resolved without the authors' extraction and clarification.
 
 Once those choices are recorded, confirm institutional approval and the
 current PhysioNet credentialed-data terms before moving any records to Google

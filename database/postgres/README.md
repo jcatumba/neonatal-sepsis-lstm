@@ -2,8 +2,9 @@
 
 This imports the PICDB v1.1.0 CSV release into a new, local-only PostgreSQL
 container, verifies the source checksums, and provides aggregate integrity and
-paper-aligned profiling queries. It does not import data into Google Drive or
-Colab, alter source files, generate a patient-level extract, or train a model.
+paper-aligned profiling queries. The optional builder produces a private local
+patient-level dataset. The workflow does not import data into Google Drive or
+Colab, alter source files, or train a model.
 
 ## Requirements
 
