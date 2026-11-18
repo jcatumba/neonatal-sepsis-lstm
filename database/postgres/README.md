@@ -165,6 +165,47 @@ docker compose --project-name picdb-repro \
   -f database/postgres/compose.yaml stop postgres
 ```
 
+## Audit expanded candidate variables (development only)
+
+With the imported database running and the original local mortality dataset
+available, run from the project root:
+
+```bash
+python -m database.postgres.audit_candidate_variables \
+  --output-dir outputs/mortality-development/candidate-audit-final
+```
+
+Choose another **new** output directory when reproducing an existing run;
+the command refuses overwrites. It reads only the eight train/validation
+patient-ID, admission-ID, label and input arrays in the private original
+`outputs/mortality-dataset/dataset.npz`, not test arrays. Original identifiers
+are used transiently to constrain every event query by patient and admission.
+The transaction is `REPEATABLE READ READ ONLY`, with a 180-second per-statement
+timeout. It does not create database tables/indexes or train models.
+
+The private `candidate_audit.json` (directory 700, file 600) inventories all
+17 sources/dictionaries, profiles numeric events in four sources, reports
+62 curated candidates and pairwise/panel coverage, and checks original
+three-marker masks against the frozen development export. Only aggregate
+results are exported, not identifiers, individual measurements or clinical
+text. Source manifest, development-array digest, implementation hash and
+Python/NumPy/pandas versions support provenance.
+
+Candidate profiles enforce explicit units, finite uncensored numeric values,
+the original first-24-hour window and last-valid-event binning. Where a
+record-availability timestamp exists it must precede the landmark and not
+precede the event. Laboratory event time alone is not verified result
+availability. Broad extreme-value bounds **flag, but do not remove** records;
+they are not neonatal reference ranges or approved cleaning rules. Numeric
+equality/correlation alone does not prove clinical equivalence of codes.
+
+The completed definitive run is under `candidate-audit-final/`; earlier
+`candidate-audit/` and `candidate-audit-reviewed/` are preliminary outputs.
+See the [review findings](../../Data%20and%20code%20review%20and%20preparation.md#expanded-variable-audit-same-mortality-endpoint-and-autoencoder)
+for the complete coverage table, quality holds and proposed next experiment.
+No new panel is adopted, no test evaluation is performed and no Colab run or
+cloud upload is needed for this audit.
+
 ## Data-use note
 
 PICDB ships with the PhysioNet Credentialed Health Data License. The local

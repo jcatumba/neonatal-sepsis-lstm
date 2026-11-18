@@ -52,6 +52,11 @@ nested patient-grouped validation, without touching test.
 The subsequent [temporal-information audit](colab/README_MORTALITY.md#auditing-temporal-information-without-training)
 quantifies real observations versus filled values and repeated biomarker
 measurements, without training or evaluating any model.
+The [expanded-variable audit](colab/README_MORTALITY.md#auditing-additional-variables-locally)
+inventories the local PICDB sources and profiles 62 candidate variables on
+development admissions only. It documents quality/availability constraints
+before any extension of the main mortality autoencoder; no new model or
+test evaluation is performed.
 
 ## Run in Google Colab
 

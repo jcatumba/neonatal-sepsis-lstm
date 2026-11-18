@@ -683,6 +683,278 @@ and outcome strata; input and prior report hashes are unchanged. No individual
 measurements, groups, scores or predictions are written. **No Colab execution
 is necessary for this completed audit.**
 
+### Expanded-variable audit: same mortality endpoint and autoencoder
+
+The user authorized investigating variables beyond the paper's three markers.
+The objective remains **same-hospitalization mortality risk at the 24-hour
+hospital landmark**, with the **LSTM autoencoder as the main method**, not
+sepsis classification or a supervised replacement. Adding variables would be
+an explicitly declared extension of the paper-related experiment.
+
+The completed local audit uses exactly the original **1,817 development
+admissions, 1,778 patients and 157 death admissions**. It does not expand the
+cohort, choose complete cases, train models, fit preprocessing, access test
+arrays, change PostgreSQL or transfer data to a cloud service. The original
+three-marker observation masks match the frozen development export exactly.
+
+#### Scope and source inventory
+
+All 17 imported tables and both event dictionaries are inventoried. Detailed
+numeric first-24-hour profiling covers four event sources; other sources are
+reviewed for structure, timing and suitability, not exhaustively interpreted
+as clinical text, drug administrations or diagnosis histories.
+
+| Numeric source | First-24-hour records | Admissions with any record | Observed item/unit groups |
+|---|---:|---:|---:|
+| LABEVENTS | 256,802 | 1,817 | 412 |
+| CHARTEVENTS | 21,175 | 1,702 | 17 |
+| OUTPUTEVENTS | 445 | 113 | 3 |
+| SURGERY_VITAL_SIGNS | 7,948 | 47 | 14 |
+
+These inventory counts precede candidate-specific numerical/unit rules.
+The report includes the full dictionaries, observed item/unit catalogue,
+62 curated candidate profiles, 1,891 pairwise profiles, static context and
+four prospective panel summaries. It preserves the imported source manifest.
+
+Numerical candidates require finite, uncensored values in explicitly accepted
+units. Hemoglobin `5257` has an explicit g/dL-to-g/L conversion; blank units
+are accepted only for named dimensionless pH/INR codes. Inequalities such as
+`<0.5` are reported, not treated as exact numbers or silently imputed.
+Ten 2.4-hour bins retain the last usable event, with numeric row ID breaking
+timestamp ties. When `storetime` exists, require
+`event_time <= storetime < landmark`. LABEVENTS has no result-availability
+timestamp: its first-24-hour measurements are **event-time proxies**, not
+proof that the result was available at prediction time.
+
+#### Complete curated candidate coverage
+
+Counts below use **all 1,817 development admissions**, including those without
+that variable. "Repeated" means valid observations in at least two distinct
+2.4-hour bins, not merely two source rows. Technical validity here is **not**
+clinical plausibility: the diagnostic extreme-value flags below do not remove
+records. Codes are laboratory codes unless prefixed `chart` or `output`.
+
+| Candidate | Item code(s); accepted unit | Any bin | Repeated |
+|---|---|---:|---:|
+| Lactate, baseline | 5227; mmol/L | 1,804 | 1,233 |
+| Total bilirubin, baseline | 5075/5255; micromol/L | 1,806 | 1,622 |
+| Creatinine, baseline | 5032/5041; micromol/L | 1,518 | 79 |
+| CRP | 5626/5821; mg/L | 1,224 | 363 |
+| Procalcitonin | 6085; ng/ml | 29 | 0 |
+| Platelets | 5129; x10^9/L | 1,728 | 668 |
+| White blood cells | 5141; x10^9/L | 1,728 | 664 |
+| Neutrophil count | 5094; x10^9/L | 1,469 | 474 |
+| Neutrophil percentage | 5095; % | 1,723 | 650 |
+| Lymphocyte count | 5110; x10^9/L | 1,471 | 480 |
+| Lymphocyte percentage | 5111; % | 1,717 | 647 |
+| Hemoglobin, CBC | 5099; g/L | 1,728 | 668 |
+| Hematocrit, CBC | 5097; % | 1,729 | 668 |
+| Hemoglobin, gas-associated code | 5257; g/L or converted g/dL | 1,804 | 1,234 |
+| Hematocrit, gas-associated code | 5225; % | 1,803 | 1,237 |
+| Glucose | 5223; mmol/L | 1,796 | 1,208 |
+| Sodium | 5230; mmol/L | 1,805 | 1,240 |
+| Chloride | 5218; mmol/L | 1,805 | 1,240 |
+| Potassium, specimen ambiguous | 5226; mmol/L | 1,805 | 1,239 |
+| Calcium, dictionary label Total | 5215; mmol/L | 1,805 | 1,239 |
+| pH | 5237; dimensionless | 1,803 | 1,239 |
+| pH, alternate | 5238; dimensionless | 437 | 297 |
+| pCO2 | 5235; mmHg | 1,805 | 1,239 |
+| pCO2, alternate | 5236; mmHg | 435 | 296 |
+| pO2 | 5239; mmHg | 1,805 | 1,240 |
+| pO2, alternate | 5244; mmHg | 435 | 296 |
+| Calculated bicarbonate | 5224; mmol/L | 1,805 | 1,239 |
+| Bicarbonate | 5248; mmol/L | 1,804 | 1,237 |
+| Base excess | 5211; mmol/L | 1,802 | 1,235 |
+| Base excess, alternate | 5249; mmol/L | 1,803 | 1,238 |
+| Anion gap | 5212; mmol/L | 1,366 | 922 |
+| Oxygen saturation, gas-associated code | 5252; % | 1,804 | 1,237 |
+| FiO2 | 5222; % | 435 | 296 |
+| Direct bilirubin | 5042; micromol/L | 1,459 | 2 |
+| Indirect bilirubin | 5055; micromol/L | 1,473 | 2 |
+| Albumin | 5024; g/L | 1,486 | 3 |
+| Total protein | 5078; g/L | 1,490 | 4 |
+| Urea | 5033; mmol/L | 1,509 | 60 |
+| ALT | 5026; U/L | 1,523 | 71 |
+| AST | 5031; U/L | 1,483 | 4 |
+| LDH | 5057; U/L | 1,470 | 35 |
+| Chemistry sodium | 5062; mmol/L | 0 | 0 |
+| Chemistry calcium | 5034; mmol/L | 1,485 | 5 |
+| Magnesium | 5059; mmol/L | 1,171 | 3 |
+| Phosphate | 5072; mmol/L | 1,487 | 5 |
+| INR | 5174; dimensionless | 545 | 88 |
+| PT | 5186/6890; seconds | 545 | 88 |
+| APTT | 5161/6892; seconds | 535 | 81 |
+| Fibrinogen | 5164; g/L | 79 | 4 |
+| D-dimer | 5163; mg/L | 78 | 4 |
+| Heart rate | chart 1003; bpm | 906 | 331 |
+| Pulse, kept separate | chart 1002; bpm | 304 | 255 |
+| Respiratory rate, unresolved unit conflict | chart 1004; insp/min required | 0 | 0 |
+| Temperature | chart 1001; Celsius | 1,039 | 571 |
+| Pulse SpO2 | chart 1006; % | 372 | 256 |
+| Systolic pressure | chart 1016; mmHg | 578 | 163 |
+| Diastolic pressure | chart 1015; mmHg | 578 | 163 |
+| Chart glucose | chart 1011; mmol/L | 170 | 1 |
+| Current weight, not verified birth weight | chart 1014; kg | 349 | 19 |
+| Height | chart 1013; cm | 0 | 0 |
+| Chart urine volume | chart 1008; ml | 299 | 0 |
+| Output urine volume | output 1034; ml | 112 | 89 |
+
+Internal names such as `glucose_gas` describe the candidate grouping, not
+verified specimen provenance. In particular, dictionary code `5223` is
+categorized Chemistry. Do not infer arterial sampling from panel co-occurrence.
+
+#### Quality and mapping decisions required before extraction
+
+- **Severe numerical anomalies:** sodium `5230` includes one value of
+  21,845,639,168 mmol/L. It is not the final selected value of its bin, so
+  **zero sodium last-bin cells** exceed the broad diagnostic bounds. This
+  does not justify ignoring raw-data quality or assuming other aggregation
+  policies would be safe. Chloride has one flagged record/one selected cell;
+  heart rate two/two; pulse two/two; gas oxygen saturation 41/36; pulse SpO2
+  zero/zero. Bounds are sodium 50--250, chloride 30--250, heart rate/pulse
+  10--500, saturations 0--100. These are **technical review flags**, not
+  neonatal reference intervals or applied exclusions. No clipping, correction
+  or physiological filtering has been selected.
+- **Recorded zeros:** WBC has one zero event, platelets four, CBC hemoglobin
+  two and CBC hematocrit two. Review sentinel/measurement semantics before
+  deciding whether these are admissible. Extreme AST/LDH and negative derived
+  values likewise require explicit policies, not guesses about normality.
+- **Respiratory rate is not absent:** 4,615 records concern 1,049 admissions,
+  but recorded `bpm` conflicts with dictionary `insp/min`. All are rejected
+  under the current strict unit rule. Resolve the mapping before use.
+- **Potassium and calcium are on hold:** `5226` has dictionary fluid
+  "Other Body Fluid"; `5215` says "Calcium, Total" despite values suggestive
+  of another measurement. Neither a blood-potassium nor ionized-calcium
+  interpretation has been established.
+- **Censoring matters:** CRP has 826 censored records of 2,474 (33.39%).
+  Its 1,648 strictly usable records cover 1,224 admissions (67.36%).
+  A detection-limit/inequality policy is necessary before promoting it.
+  Procalcitonin's 29 covered admissions make it unsuitable for the initial
+  general-purpose panel. PT/APTT also have censored values.
+- **Do not equate oxygen measures:** gas saturation is not pulse SpO2;
+  pO2/pCO2 sampling type is unverified. FiO2 `5222` is recorded as 21% for all
+  its usable observations and adds no numeric variance here.
+- **Static context:** age and sex are recorded, but 33 admissions have
+  birth-after-admission flags. Resolve age semantics first. Current charted
+  weight is not established birth weight; do not manufacture a birth-weight
+  predictor or copy static values into ten fictitious observations.
+
+#### Redundancy, timing and prospective panels
+
+Spearman correlations describe joint last-valid admission/bin values; repeated
+cells are not independent samples and these are not causal or prognostic tests.
+Examples are CBC hemoglobin/hematocrit 0.9840, gas-associated
+hemoglobin/hematocrit 0.9998, WBC/neutrophil count 0.9183, neutrophil/lymphocyte
+percentages -0.9538, total/indirect bilirubin 0.9691, bicarbonate/base excess
+0.9939 and INR/PT 0.9996. Avoid adding both members of near-duplicate pairs
+without a specific justification.
+
+Main/alternate pH, pCO2 and pO2 have correlation 1 and numerically equal
+selected values in all their shared cells (1,084, 1,081 and 1,081 cells,
+respectively). This is evidence for a mapping/duplication investigation, not
+authorization to merge specimen types. Numerical equality alone does not
+establish clinical equivalence; the JSON labels this explicitly.
+
+Unlike the earlier NPZ-only audit, source timestamps permit exact successive
+event-time intervals within admissions. Pooled interval medians are lactate
+5.10 hours, glucose 5.11, pH 4.99, platelets 14.28, WBC 14.32, heart rate
+3.86, pulse 2.00, temperature 2.02 and SpO2 1.99. These are intervals between
+recorded usable event timestamps, not verified sampling intervals, averages
+per patient or laboratory result turnaround. Chart-variable median
+storetime-minus-event-time is zero; that does not prove bedside availability
+for laboratory results lacking a result timestamp.
+
+| Prospective panel, not adopted | Observed cells / possible cells | Median observed cells | Median occupied bins | All variables ever observed | All variables repeated |
+|---|---:|---:|---:|---:|---:|
+| Baseline three | 20.21% | 6 | 3 | 1,504 | 69 |
+| Baseline + glucose, sodium, chloride, pCO2 | 22.49% | 14 | 3 | 1,498 | 69 |
+| Baseline + platelets, WBC | 17.57% | 8 | 3 | 1,447 | 47 |
+| Baseline + heart rate, temperature | 17.61% | 8 | 4 | 473 | 10 |
+
+Each density denominator changes with the number of variables. Lower density
+does not mean observations were lost. Laboratory-panel masks often overlap
+almost completely: the gas-associated extension mostly adds channels at
+existing measurement times, **not dense new trajectories**. Routine vitals
+extend temporal coverage, but incomplete and potentially care-dependent
+recording makes a universal multivariable vital-sign sequence unrealistic.
+The gas-panel proposal includes unresolved sodium quality and pCO2 provenance;
+it is a descriptive coverage probe, not the recommended finalized panel.
+
+#### Other-source eligibility
+
+First-24-hour counts below refer to original development admissions only:
+
+- INPUTEVENTS: 299 records/299 admissions; volume without composition/item ID
+  and unclear intervals, not a ready fluid-balance channel.
+- PRESCRIPTIONS: 13,019/405; orders are not administrations and start dates do
+  not establish hour-level exposure. Do not treat final orders as early drugs.
+- MICROBIOLOGYEVENTS: 9,647/1,790; specimen time cannot make final organisms or
+  susceptibility results available at the landmark.
+- OR_EXAM_REPORTS: 5,151/1,739; 4,883 have verified report timing before the
+  landmark, but the table lacks structured numeric result measurements.
+- EMR_SYMPTOMS: 13,312/103; text/categorical content needs a separate terminology
+  and documentation-time design. No free-text clinical content was exported.
+- SURGERY_INFO: 46/46; surgical exposure is subgroup-specific. Surgical vital
+  signs cover only 47 admissions and lack row-level units; do not use them
+  as general NICU monitoring.
+- ICUSTAYS: 1,037 first-window entries/1,034 admissions; 735 entry records
+  precede hospital admission. Preserve the hospital landmark rather than
+  silently replacing it with ICU entry. Future outtime/LOS are excluded.
+- DIAGNOSES_ICD has no diagnosis-availability timestamp; final-stay diagnosis
+  codes are excluded. Its dictionary is terminology, not a timed predictor.
+  Admission/patient tables supply cohort validation, outcome and static
+  context; discharge/death fields never become candidate inputs.
+
+#### Conclusions and proposed next experiment
+
+**Expansion is feasible, but improved mortality discrimination is unproven.**
+The first panel worth specifying after clinical/unit QC is the baseline three
+plus **glucose `5223`, pH `5237`, platelets `5129` and WBC `5141`**. This
+seven-variable proposal spans metabolic, acid-base and hematologic domains
+without deliberately duplicating Hb/Hct or multiple acid-base derivatives.
+It has **not** been extracted, selected by outcome performance, trained or
+adopted. Per-variable coverage above does not establish joint seven-variable
+completeness. Temperature is a possible separate addition/ablation; do not
+require complete cases or discard the original cohort to make it look dense.
+
+Before any new training:
+
+1. Approve explicit unit/specimen, censoring, sentinel and extreme-value rules.
+   Record rejected counts and preserve raw values. Diagnostic bounds above
+   are not automatically those rules.
+2. Freeze the small panel and extraction contract on development patients
+   only, retaining the hospital landmark, ten bins and original masks.
+   Generalize the existing three-marker shape assumptions explicitly.
+3. Compare the unchanged baseline with the expanded AE under the same grouped
+   folds and fold-local preprocessing. Prespecify loss/score normalization
+   across variables: extra channels can reweight reconstruction error even
+   without useful information. Keep the temporal-order ablation as a possible
+   controlled diagnostic, not an already completed experiment.
+4. Report exploratory development results, not a new independent test claim.
+   The historical test has already been inspected; do not repeatedly evaluate
+   it while designing this extension. Independent confirmation is still needed.
+
+Implementation:
+[`audit_candidate_variables.py`](./database/postgres/audit_candidate_variables.py)
+and [local instructions](./database/postgres/README.md#audit-expanded-candidate-variables-development-only).
+The definitive aggregate report is
+`outputs/mortality-development/candidate-audit-final/candidate_audit.json`;
+earlier `candidate-audit/` and `candidate-audit-reviewed/` outputs are retained
+as preliminary runs, not the definitive report. The output contains no original
+patient/admission identifiers or individual measurements and remains private
+(directory 700, JSON 600). Focused tests cover development-only NPZ access,
+SQL restrictions, window/timing guards, censoring, units, tie-breaking,
+coverage, descriptive redundancy and non-destructive extreme-value flags.
+Final validation passed 40 focused mortality tests; three notebook-specific
+checks were deselected because no notebook execution was requested. Python
+syntax checks and `git diff --check` passed. The report's implementation hash
+matches the audit code; source catalogue counts conserve across all four
+numeric sources, and the development NPZ and earlier AE study hashes remain
+unchanged. Only existing Matplotlib/pyparsing deprecation warnings occurred.
+**No Colab execution is necessary for this completed audit.** A later approved
+training extension requires a new development export/runner; the existing
+three-marker Colab notebook does not accept additional channels automatically.
+
 ### Questions for the authors
 
 The authors have not been contacted as part of this local analysis. To
@@ -703,14 +975,17 @@ search did not improve its measured performance. Do not silently substitute
 the supervised logistic comparator for the main method. Its experimental
 fixed-`C=1` pipeline and Youden policy remain secondary frozen artifacts.
 
-The temporal audit now establishes sparse, unevenly sampled biomarker
-trajectories, not whether ordering improves mortality ranking. Agree the
-temporal-order ablation and evaluation strategy before another LSTM search.
-The negative tuning result and structural audit do not themselves establish
-why discrimination is modest. Measurement-gap inputs, new predictors or a
-different window would be new protocol choices, not a reconstruction of
-unspecified article details. Avoid repeated optimization against these outer
-folds or any use of the inspected test for development decisions.
+The temporal audit establishes sparse trajectories; the subsequently authorized
+expanded-variable audit identifies feasible extra domains and unresolved
+quality/availability issues. Next agree the QC rules, small candidate panel,
+loss/score normalization and grouped development comparison before extracting
+or training the expanded autoencoder. The proposed seven-variable panel above
+is not yet adopted. The temporal-order ablation remains an optional diagnostic,
+not a completed experiment. Neither audit establishes why discrimination is
+modest or guarantees improvement. New predictors are an explicit extension,
+not recovered article details; the endpoint and autoencoder objective remain
+unchanged. Avoid repeated optimization against these outer folds or any use
+of the inspected test for development decisions.
 
 Independent confirmation remains unresolved. Do not claim a new confirmed test
 score or apply pooled fold-specific logistic metrics to its frozen full-data

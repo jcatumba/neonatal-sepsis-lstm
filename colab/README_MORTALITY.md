@@ -416,12 +416,40 @@ in 4.35% of admissions. All three repeat in only 3.80%.
 
 The loss/score still exclude imputed targets; masks already distinguish
 observations from fills. These findings indicate limited/irregular temporal
-coverage, not a proven cause of weak discrimination. The next suggested
-experiment is a prespecified temporal-order ablation, **not performed here**,
-before more hyperparameter search. The LSTM remains the main method.
+coverage, not a proven cause of weak discrimination. A prespecified
+temporal-order ablation remains a possible diagnostic, **not performed here**.
+The subsequently authorized candidate-variable audit is described below.
+The LSTM remains the main method.
 See the [review report](../Data%20and%20code%20review%20and%20preparation.md) for
 definitions, outcome-stratified descriptions and limitations.
 **No Colab rerun is necessary for this audit.**
+
+## Auditing additional variables locally
+
+The completed PostgreSQL audit keeps the hospital-mortality endpoint, 24-hour
+landmark, original development patients and autoencoder objective unchanged.
+It inventories all 17 tables, profiles four numeric event sources and audits
+62 candidate variables, without reading test arrays or fitting models.
+
+Use the [local audit command](../database/postgres/README.md#audit-expanded-candidate-variables-development-only);
+do not upload the identifier-bearing original audit NPZ or connect Colab
+to PostgreSQL. The definitive private aggregate report is
+`outputs/mortality-development/candidate-audit-final/candidate_audit.json`.
+See the [full findings and candidate table](../Data%20and%20code%20review%20and%20preparation.md#expanded-variable-audit-same-mortality-endpoint-and-autoencoder).
+
+Glucose, pH and hematology have useful coverage for a potential small
+extension. Gas-associated channels mostly share existing measurement times;
+routine vital signs add temporal observations but have limited cohort
+coverage. Severe raw outliers, censored CRP, respiratory-rate unit conflicts,
+ambiguous potassium/calcium mappings and unverified laboratory result
+availability require explicit decisions. Diagnostic flags do not clean data
+automatically, and no expanded panel has been trained or adopted.
+
+**No Colab rerun is necessary for this audit.** Approve QC rules and the
+development-only comparison protocol before preparing a new export/runner.
+The current notebook still expects the original three biomarkers and six
+input channels; it does not support extra variables merely by changing a path.
+Do not rerun its test evaluation to choose the expanded panel.
 
 ## Troubleshooting
 
