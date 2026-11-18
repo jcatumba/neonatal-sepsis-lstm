@@ -10,8 +10,8 @@ from .mortality_model import MortalityAutoencoder, observed_error
 @torch.no_grad()
 def reconstruction_scores(model: MortalityAutoencoder, x: np.ndarray,
                           batch_size: int = 64) -> np.ndarray:
-    if x.ndim != 3 or x.shape[1:] != (10, 6) or not len(x) or batch_size < 1:
-        raise ValueError("Expected nonempty (admissions, 10, 6) sequences.")
+    if x.ndim != 3 or x.shape[1:] != (10, 2 * model.output.out_features) or not len(x) or batch_size < 1:
+        raise ValueError("Expected nonempty ten-bin sequences matching the model's value and mask channels.")
     model.eval()
     device = next(model.parameters()).device
     scores = []

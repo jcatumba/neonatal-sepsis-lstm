@@ -445,11 +445,36 @@ ambiguous potassium/calcium mappings and unverified laboratory result
 availability require explicit decisions. Diagnostic flags do not clean data
 automatically, and no expanded panel has been trained or adopted.
 
-**No Colab rerun is necessary for this audit.** Approve QC rules and the
-development-only comparison protocol before preparing a new export/runner.
-The current notebook still expects the original three biomarkers and six
-input channels; it does not support extra variables merely by changing a path.
-Do not rerun its test evaluation to choose the expanded panel.
+**No Colab rerun is necessary for this audit.** The current notebook still
+expects the original three biomarkers and six input channels; it does not
+support extra variables merely by changing a path. Do not rerun its test
+evaluation to choose the expanded panel.
+
+## Comparing fixed panels on development only
+
+The approved local retrospective comparison is complete. With the original
+private development NPZ and validated local PostgreSQL import, reproduce from
+the repository root (use a new export directory and pass its NPZ as `--input-file` when
+repeating the commands):
+
+```bash
+python -m database.postgres.export_mortality_panels
+python -m src.mortality_panel_study
+```
+
+The export preserves the frozen baseline inputs and adds four laboratory
+channels using event time as a proxy for result availability. It contains
+only development observations, labels, and pseudonymous patient groups; keep
+it private. Comparisons use the same five patient-disjoint folds,
+fold-local preprocessing and fixed epochs. Sensitivity re-fits all panels
+without the last 2.4 hours of laboratory events. That buffer does not verify
+result availability.
+
+Glucose + pH led the primary and sensitivity comparisons. The baseline and
+combined panel remain candidates for a prespecified comparison. No test
+arrays were read, and no final model or threshold was fitted. See
+[results and evaluation safeguards](../Data%20and%20code%20review%20and%20preparation.md#fixed-panel-lstm-comparison-development-only).
+**No Colab run or upload is needed.**
 
 ## Troubleshooting
 

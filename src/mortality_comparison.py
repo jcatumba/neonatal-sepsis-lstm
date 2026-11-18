@@ -41,15 +41,19 @@ def complete_sequences(observed: np.ndarray, medians: np.ndarray) -> np.ndarray:
 
 
 def fold_sequences(training: np.ndarray, validation: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    if (training.ndim != 3 or training.shape[1] != 10 or training.shape[2] == 0
+            or validation.ndim != 3 or validation.shape[1:] != training.shape[1:]):
+        raise ValueError("Expected matching ten-bin biomarker arrays.")
+    markers = training.shape[-1]
     if not np.isfinite(training).any(axis=(0, 1)).all():
         raise ValueError("Each biomarker must be observed in the fold's fitting population.")
     medians = np.nanmedian(training, axis=(0, 1))
     filled_train = complete_sequences(training, medians)
-    scaler = MinMaxScaler().fit(filled_train.reshape(-1, 3))
+    scaler = MinMaxScaler().fit(filled_train.reshape(-1, markers))
     result = []
     for raw, filled in ((training, filled_train),
                         (validation, complete_sequences(validation, medians))):
-        values = scaler.transform(filled.reshape(-1, 3)).reshape(filled.shape)
+        values = scaler.transform(filled.reshape(-1, markers)).reshape(filled.shape)
         sequences = np.concatenate((values, np.isfinite(raw)), axis=2).astype(np.float32)
         if not np.isfinite(sequences).all():
             raise ValueError("Fold preprocessing produced nonfinite values.")

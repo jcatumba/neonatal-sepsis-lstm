@@ -12,15 +12,15 @@ from .utils import set_seed
 
 
 class MortalityAutoencoder(nn.Module):
-    """Encode six input channels and reconstruct three biomarker channels."""
+    """Encode values and observation masks; reconstruct values only."""
 
-    def __init__(self):
+    def __init__(self, markers: int = 3):
         super().__init__()
-        self.encoder_1 = nn.LSTM(6, 64, batch_first=True)
+        self.encoder_1 = nn.LSTM(2 * markers, 64, batch_first=True)
         self.encoder_2 = nn.LSTM(64, 32, batch_first=True)
         self.decoder_1 = nn.LSTM(32, 32, batch_first=True)
         self.decoder_2 = nn.LSTM(32, 64, batch_first=True)
-        self.output = nn.Linear(64, 3)
+        self.output = nn.Linear(64, markers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         encoded, _ = self.encoder_1(x)
@@ -34,15 +34,16 @@ class MortalityAutoencoder(nn.Module):
 def observed_error(x: torch.Tensor, reconstruction: torch.Tensor,
                    *, squared: bool) -> torch.Tensor:
     """Return one masked mean error per admission, weighted equally."""
-    if x.ndim != 3 or x.shape[-1] != 6 or reconstruction.shape != x[:, :, :3].shape:
-        raise ValueError("Expected six input and three reconstructed biomarker channels.")
-    mask = x[:, :, 3:]
+    markers = x.shape[-1] // 2 if x.ndim == 3 else 0
+    if not markers or x.shape[-1] != 2 * markers or reconstruction.shape != x[:, :, :markers].shape:
+        raise ValueError("Expected one value, mask and reconstructed channel per biomarker.")
+    mask = x[:, :, markers:]
     if not torch.all((mask == 0) | (mask == 1)):
         raise ValueError("Observation masks must be binary.")
     denominator = mask.sum(dim=(1, 2))
     if torch.any(denominator == 0):
         raise ValueError("Every admission must have an observed biomarker.")
-    difference = reconstruction - x[:, :, :3]
+    difference = reconstruction - x[:, :, :markers]
     loss = difference.square() if squared else difference.abs()
     return (loss * mask).sum(dim=(1, 2)) / denominator
 
@@ -81,7 +82,10 @@ def train_autoencoder(train_x: np.ndarray, validation_x: np.ndarray | None,
     if config.device_preference == "cuda" and config.device.type == "cpu":
         print("CUDA unavailable; training on CPU.")
     device = config.device
-    model = MortalityAutoencoder().to(device)
+    if (train_x.ndim != 3 or train_x.shape[-1] < 2 or train_x.shape[-1] % 2
+            or (validation_x is not None and validation_x.shape[1:] != train_x.shape[1:])):
+        raise ValueError("Expected matching value and mask channels.")
+    model = MortalityAutoencoder(train_x.shape[-1] // 2).to(device)
     generator = torch.Generator().manual_seed(config.seed)
     inputs = [(train_x, True)]
     if validation_x is not None:

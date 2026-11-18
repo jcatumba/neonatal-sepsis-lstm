@@ -955,6 +955,69 @@ unchanged. Only existing Matplotlib/pyparsing deprecation warnings occurred.
 training extension requires a new development export/runner; the existing
 three-marker Colab notebook does not accept additional channels automatically.
 
+### Fixed-panel LSTM comparison (development only)
+
+The approved retrospective extraction added glucose `5223`, pH `5237`,
+platelets `5129` and WBC `5141` with exact units and finite uncensored numeric
+values. Four platelet zeros and one WBC zero were excluded **before** selecting
+the last usable measurement in each bin; an earlier valid value can therefore
+still represent that bin. No clipping or learned cleaning was applied. The
+three-marker reference arrays, labels and group assignments match the frozen
+development export exactly. Laboratory event time is a proxy for result
+availability, not proof of real-time availability.
+
+Four fixed autoencoder panels were compared over the same five
+patient-disjoint folds, with 10 epochs, no held-fold checkpoint selection,
+and imputation and MinMax fitted only on each fitting fold. Labels did not
+enter the reconstruction gradient. Observed-cell mean MSE for training and
+mean MAE for scoring retain the baseline weighting convention; adding
+channels also changes the composition of the reconstruction score. The
+24-hour endpoint and original 1,817 development admissions were unchanged.
+
+| Panel (additions to baseline) | 24h AP | 24h AUROC | Sensitivity AP | Sensitivity AUROC |
+|---|---:|---:|---:|---:|
+| None | 0.2151 | 0.6217 | 0.2085 | 0.6097 |
+| Glucose + pH | 0.2384 | 0.6713 | 0.2365 | 0.6646 |
+| Platelets + WBC | 0.2060 | 0.6264 | 0.2005 | 0.6119 |
+| All four | 0.2323 | 0.6679 | 0.2263 | 0.6531 |
+
+These are fold means, not pooled scores. The reference reproduced the previous
+24-hour development metrics in every fold. Glucose + pH improved AP in all five
+folds in both analyses, by +0.0233 on average in the primary comparison and
++0.0280 in sensitivity. The combined panel improved primary AP in four of five;
+hematology alone did not improve mean AP.
+
+In the sensitivity analysis all panels ignore events at or after 21.6 hours
+before refitting, keeping the 24-hour outcome landmark and original fold
+assignments. Two admissions with no earlier baseline observation were removed
+from **all** sensitivity panels; no deaths were removed (1,815 admissions,
+157 deaths). Compare panels within a window; this is not a matched estimate
+of the impact of the cutoff itself, nor proof that early lab events had
+available results.
+
+The proposed final shortlist is the original baseline, glucose + pH as the
+primary challenger, and the combined panel as a secondary challenger. Before
+any final evaluation, freeze the inputs, fitting procedure, metrics, and
+comparison/reporting plan. If reporting threshold metrics, derive thresholds
+only from development predictions. Use a single evaluation of the frozen
+list, not the test to pick a winner or retune it. The previously inspected
+test is a historical comparison set, not independent confirmation; seek a
+new untouched cohort for a confirmatory claim. No final fit, threshold or
+test evaluation was performed here.
+
+Reproduction commands (from the root; choose new output directories if
+repeating the commands):
+
+```bash
+python -m database.postgres.export_mortality_panels
+python -m src.mortality_panel_study
+```
+
+Private outputs: `outputs/mortality-development/panel-export/` (development
+NPZ and extraction metadata) and `outputs/mortality-development/panel-study/`
+(aggregate `study.json` and training log). Do not upload the extraction.
+The comparison completed locally; no Colab rerun is needed.
+
 ### Questions for the authors
 
 The authors have not been contacted as part of this local analysis. To
@@ -975,17 +1038,13 @@ search did not improve its measured performance. Do not silently substitute
 the supervised logistic comparator for the main method. Its experimental
 fixed-`C=1` pipeline and Youden policy remain secondary frozen artifacts.
 
-The temporal audit establishes sparse trajectories; the subsequently authorized
-expanded-variable audit identifies feasible extra domains and unresolved
-quality/availability issues. Next agree the QC rules, small candidate panel,
-loss/score normalization and grouped development comparison before extracting
-or training the expanded autoencoder. The proposed seven-variable panel above
-is not yet adopted. The temporal-order ablation remains an optional diagnostic,
-not a completed experiment. Neither audit establishes why discrimination is
-modest or guarantees improvement. New predictors are an explicit extension,
-not recovered article details; the endpoint and autoencoder objective remain
-unchanged. Avoid repeated optimization against these outer folds or any use
-of the inspected test for development decisions.
+The fixed development comparison now supports shortlisting glucose + pH and
+the combined panel alongside the original reference. No panel is frozen as a
+final model. Freeze the final evaluation protocol before opening any test
+data, and distinguish historical test results from independent confirmation.
+The temporal-order ablation remains an optional diagnostic, not a completed
+experiment. New predictors are an explicit extension, not recovered article
+details; the endpoint and autoencoder objective remain unchanged.
 
 Independent confirmation remains unresolved. Do not claim a new confirmed test
 score or apply pooled fold-specific logistic metrics to its frozen full-data
