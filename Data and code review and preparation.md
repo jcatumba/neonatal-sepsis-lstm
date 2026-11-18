@@ -1018,6 +1018,53 @@ NPZ and extraction metadata) and `outputs/mortality-development/panel-study/`
 (aggregate `study.json` and training log). Do not upload the extraction.
 The comparison completed locally; no Colab rerun is needed.
 
+### Supervised GRU-D comparison (development only)
+
+The LSTM autoencoder remains the article-reproduction method. This separate
+experiment compares supervised alternatives for the same 24-hour
+in-hospital mortality endpoint. All four models use lactate, total bilirubin,
+creatinine, glucose and pH, the same five patient-disjoint folds and the same
+eligibility within each analysis. The primary analysis includes 1,817
+admissions and 157 deaths; masking the last 2.4 hours leaves 1,815 admissions
+and the same 157 deaths. The test set was not opened.
+
+The GRU-D has 16 hidden units and learns input and hidden-state decay from
+per-marker gaps measured in 2.4-hour bin steps. Observed values are
+standardized with fitting-fold statistics only. Missing inputs decay from
+their last observed value toward the fitting mean. The no-decay control uses
+the same masks, shared-weight initialization, and 20-epoch supervised
+training, but carries past values without decay. The logistic comparison
+uses fixed L2 `C=1` and five summaries per variable, all preprocessing fit
+within each training fold. The autoencoder reproduces the previous
+glucose+pH fold metrics exactly in both windows. No hyperparameter,
+checkpoint or threshold was selected on held-out folds.
+
+| Model | AP, 24h | AUROC, 24h | AP, last bin masked | AUROC, last bin masked |
+|---|---:|---:|---:|---:|
+| LSTM autoencoder | 0.2384 | 0.6713 | 0.2365 | 0.6646 |
+| L2 logistic regression | 0.3141 | 0.7220 | 0.3134 | 0.6936 |
+| GRU without decay | 0.3575 | 0.7407 | 0.3592 | 0.7326 |
+| GRU-D | 0.3589 | 0.7352 | 0.3549 | 0.7270 |
+
+AP is the primary metric; these are fold means. GRU-D gained 0.1205 AP
+versus the autoencoder and 0.0448 versus logistic regression at 24 hours
+(higher in five and three folds, respectively). In contrast, the gain
+versus the no-decay GRU was only 0.0014 at 24 hours (three of five folds)
+and reversed to -0.0044 with the last bin masked (two of five).
+AUROC favored the no-decay GRU in both analyses. The experiment supports
+shortlisting the simpler supervised GRU; it does not show a consistent
+benefit from learned decay, nor does the autoencoder comparison isolate
+the effect of supervision from other model and training differences.
+The recurrent comparison uses binned gaps, not exact event intervals;
+neither window verifies laboratory result availability. Measurement
+patterns may reflect care practices. These internal results do not
+establish external performance, calibrated risk or clinical utility.
+
+Run locally with `python -m src.mortality_grud` using the existing panel
+development export. The private aggregate report and log are under
+`outputs/mortality-development/grud-study/`. No Colab run, final model,
+threshold or test evaluation is needed for this comparison.
+
 ### Questions for the authors
 
 The authors have not been contacted as part of this local analysis. To
@@ -1038,9 +1085,11 @@ search did not improve its measured performance. Do not silently substitute
 the supervised logistic comparator for the main method. Its experimental
 fixed-`C=1` pipeline and Youden policy remain secondary frozen artifacts.
 
-The fixed development comparison now supports shortlisting glucose + pH and
-the combined panel alongside the original reference. No panel is frozen as a
-final model. Freeze the final evaluation protocol before opening any test
+The fixed development comparison supports shortlisting glucose + pH and
+the combined panel alongside the original reference. For a separate supervised
+comparison, prefer the simpler no-decay GRU over GRU-D on current evidence
+and retain the same-panel logistic comparator. No model is frozen.
+Freeze the final evaluation protocol before opening any test
 data, and distinguish historical test results from independent confirmation.
 The temporal-order ablation remains an optional diagnostic, not a completed
 experiment. New predictors are an explicit extension, not recovered article

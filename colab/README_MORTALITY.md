@@ -476,6 +476,20 @@ arrays were read, and no final model or threshold was fitted. See
 [results and evaluation safeguards](../Data%20and%20code%20review%20and%20preparation.md#fixed-panel-lstm-comparison-development-only).
 **No Colab run or upload is needed.**
 
+## Comparing GRU-D on development only
+
+Run `python -m src.mortality_grud` locally with the existing panel development
+export. Use a new `--output-dir` for reruns. This compares a GRU-D, a GRU
+without learned decay, same-panel regularized logistic regression and the
+LSTM autoencoder on the same patient-grouped folds. It repeats the comparison
+with the final 2.4 hours of laboratory events masked. The runner accepts
+only the development export and saves private aggregate results.
+
+The supervised GRUs improved development AP relative to the autoencoder,
+but learned decay did not consistently improve the simpler control. See the
+[comparison results](../Data%20and%20code%20review%20and%20preparation.md#supervised-gru-d-comparison-development-only).
+No Colab execution, upload or test access is needed.
+
 ## Troubleshooting
 
 - **Missing path or permission:** verify Drive was mounted with the correct

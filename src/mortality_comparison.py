@@ -63,9 +63,10 @@ def fold_sequences(training: np.ndarray, validation: np.ndarray) -> tuple[np.nda
 
 def biomarker_features(observed: np.ndarray) -> np.ndarray:
     """Last, minimum, maximum, slope/hour and occupied-bin count per marker."""
-    features = np.full((len(observed), 15), np.nan, dtype=float)
+    markers = observed.shape[2]
+    features = np.full((len(observed), 5 * markers), np.nan, dtype=float)
     for admission, sequence in enumerate(observed):
-        for marker in range(3):
+        for marker in range(markers):
             times = np.flatnonzero(np.isfinite(sequence[:, marker]))
             offset = marker * 5
             features[admission, offset + 4] = len(times)

@@ -3,7 +3,8 @@
 This guide covers the synthetic sepsis demo. For the PICDB mortality study,
 use the separate [mortality notebook and instructions](README_MORTALITY.md).
 The [expanded mortality panel comparison](README_MORTALITY.md#comparing-fixed-panels-on-development-only)
-runs locally without test data. Do not rerun the mortality notebook to select
+and [GRU-D comparison](README_MORTALITY.md#comparing-gru-d-on-development-only)
+run locally without test data. Do not rerun the mortality notebook to select
 candidates.
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Safiya-2026/neonatal-sepsis-lstm/blob/main/colab/neonatal_sepsis_colab.ipynb)
