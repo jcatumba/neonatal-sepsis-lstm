@@ -33,6 +33,26 @@ credentials and the complete local audit NPZ are not needed in Colab. See
 The notebook and modules must be published to the linked repository before
 the badge can open this version.
 
+For development-only comparisons of logistic regression, the all-admission
+autoencoder and the survivor-only autoencoder, use the
+[protected development workflow](colab/README_MORTALITY.md#development-only-model-comparison).
+It exports no test arrays and refits preprocessing within patient-grouped
+cross-validation. Do not rerun the original notebook to tune against test.
+The [nested logistic follow-up](colab/README_MORTALITY.md#nested-logistic-regularization-and-calibration-assessment)
+tunes regularization inside grouped folds and assesses Brier score and
+calibration without accessing test or fitting a final model.
+The subsequent [operating-point workflow](colab/README_MORTALITY.md#youden-operating-point-and-frozen-research-pipeline)
+evaluates internally selected Youden thresholds and saves a separate frozen
+research pipeline, without claiming independent validation of that final fit.
+**The autoencoder LSTM remains the main article-related method; logistic
+regression is a comparator, not its replacement.** The
+[bounded autoencoder study](colab/README_MORTALITY.md#improving-the-autoencoder-as-the-main-method)
+evaluates log transforms, training duration and survivor-only fitting with
+nested patient-grouped validation, without touching test.
+The subsequent [temporal-information audit](colab/README_MORTALITY.md#auditing-temporal-information-without-training)
+quantifies real observations versus filled values and repeated biomarker
+measurements, without training or evaluating any model.
+
 ## Run in Google Colab
 
 The following section describes the separate **synthetic sepsis demo**, not

@@ -101,6 +101,328 @@ patient scores. For new input, `transform_new_sequence` expects ten already
 binned measurements in the units in the [data review](../Data%20and%20code%20review%20and%20preparation.md).
 It does not itself extract events or validate clinical plausibility.
 
+## Development-only model comparison
+
+The original notebook **automatically evaluates test**. Do not rerun it to
+compare or tune models. Its first real test results have already been inspected;
+this does not turn that set back into a never-seen independent evaluation.
+
+The new comparison uses only the original training and validation admissions.
+From the project root, in the existing dependency environment, run:
+
+```bash
+python -m src.mortality_development
+python -m src.mortality_comparison
+```
+
+The first command reads only training/validation arrays from the private local
+audit dataset. It creates `outputs/mortality-development/development.npz`
+with only observed biomarker bins, mortality labels and arbitrary patient-group
+codes. It does not read or export test arrays or original identifiers. Observed
+values are recovered by inverting the original scaling (subject to float32
+rounding); imputed entries are discarded. No PostgreSQL connection is needed.
+Existing output files/directories are never overwritten.
+
+The second command compares three prespecified models on the same five
+patient-disjoint folds, stratified by each patient's maximum admission outcome:
+
+- L2 logistic regression, `C=1`, no class weighting, with last/minimum/maximum,
+  linear slope per hour and occupied-bin count for each marker (15 features).
+  Summaries use observed bins only, not forward-filled values. Median imputation,
+  missingness indicators and standardization are fitted on each training fold.
+- The existing observed-MSE LSTM autoencoder trained on all fitting admissions.
+- The same autoencoder trained only on fitting admissions with survival labels.
+
+Each autoencoder refits forward-fill/initial-gap medians/min-max scaling using
+its own fitting population, then runs exactly ten epochs without outer-fold
+checkpoint selection. Both rank by observed-only MAE with unchanged direction.
+This intentionally differs from the original validation-checkpointed run.
+Logistic summaries missing for an entire fitting fold use zero plus missingness
+indicators. Slopes use bin positions (2.4-hour spacing), not original event times.
+No hyperparameter search, threshold optimization, test scoring, calibration,
+risk clustering or production model selection is performed.
+
+`outputs/mortality-development/comparison/comparison.json` contains aggregate
+fold metrics, mean AUROC and average precision (the primary comparison metric),
+fold standard deviations, input hash, configuration and package versions.
+Standard deviations across overlapping training folds are **not confidence
+intervals**. Results are exploratory development estimates, not an independent
+replication or proof of clinical benefit. No individual predictions are saved.
+Keep this NPZ and all results private under the same data-use requirements.
+
+Local execution is sufficient; a new Colab run is not inherently required.
+The complete local five-fold/ten-epoch comparison has already finished: mean
+development AP was 0.277 for logistic regression, 0.215 for the all-admission
+autoencoder and 0.222 for the survivor-only autoencoder. These are development
+estimates, not new test results. **No Colab rerun is necessary to obtain this
+comparison.** See the [review report](../Data%20and%20code%20review%20and%20preparation.md)
+for the full summary and limitations.
+
+For an optional Colab rerun, publish these modules first, use a fresh runtime
+with the same repository/dependency setup, and upload **only the new development
+NPZ**. In a separate notebook, replace the original data/training/evaluation
+cells with:
+
+```python
+from pathlib import Path
+from google.colab import files
+from src.mortality_comparison import run_comparison
+from src.mortality_model import MortalityConfig
+
+uploaded = files.upload()
+if len(uploaded) != 1:
+    raise ValueError("Upload only development.npz")
+input_file = Path(next(iter(uploaded)))
+report = run_comparison(
+    input_file,
+    Path("/content/outputs/mortality-development/comparison"),
+    MortalityConfig(device_preference="cpu"),
+)
+```
+
+Download `comparison.json` before disconnecting. CPU/standard RAM is sufficient.
+The loader rejects the old exchange NPZ and the full audit NPZ. Do not run
+the original test-evaluation or inference cells in this development notebook.
+
+## Nested logistic regularization and calibration assessment
+
+After the three-model comparison, run the bounded logistic follow-up locally:
+
+```bash
+python -m src.mortality_logistic
+```
+
+It reads only the existing `outputs/mortality-development/development.npz`.
+No new export, PostgreSQL access, cloud transfer or original mortality notebook
+execution is required. `--input-file` and `--output-dir` can select other paths;
+existing outputs are never overwritten.
+
+The prespecified protocol retains the same 15 features and no class weighting:
+
+- Five outer patient-grouped, outcome-stratified folds, seed 42, matching the
+  original development comparison. Within each outer training pool, three
+  inner patient-grouped folds use seed `42 + outer_fold_number`.
+- Select `C` from `0.01, 0.1, 1, 10` by mean inner-fold average precision; exact
+  ties select the smallest `C` (strongest regularization). Every candidate fits
+  imputation, missingness indicators and scaling on its inner training fold.
+- Refit the selected pipeline on the outer training pool and score only the
+  outer validation fold. Evaluate fixed `C=1` on the same folds as a reference.
+  A constant predictor fitted to each outer training prevalence supplies the
+  Brier reference. No outer outcomes influence `C` selection.
+- Report AP, AUROC and Brier score per outer fold and as mean/sample standard
+  deviation. Brier is mean squared probability error (lower is better).
+  Every admission also gets exactly one outer out-of-fold (OOF) prediction;
+  pooled OOF metrics and a five-quantile-bin calibration curve are descriptive
+  mixtures of fold-specific models, not a single final model's performance.
+- Assess probability calibration only: no Platt/isotonic recalibration, operating
+  threshold selection, feature expansion, final model fitting or test scoring.
+
+Outputs are private aggregate files under
+`outputs/mortality-development/nested-logistic/`: `nested_logistic.json` and
+`calibration.png`. The JSON includes inner search scores, selected `C` per fold,
+bin counts/observed mortality, input and implementation hashes, and versions.
+No individual probabilities, labels or patient codes are saved.
+
+This remains exploratory internal validation: the logistic model family was
+chosen using the same development pool. Nested tuning prevents using outer
+fold outcomes for hyperparameter selection, but does not undo that earlier
+selection or provide independent clinical validation. Fold SDs are not
+confidence intervals, and the calibration curve alone cannot establish
+reliable individual mortality probabilities.
+
+The full local run is complete; **no Colab rerun is necessary**. Mean outer-fold
+AP/AUROC/Brier were 0.2728/0.6838/0.072985 for nested selection and
+0.2770/0.6899/0.073132 for fixed `C=1`. The prevalence baseline Brier was
+0.078938. The search did not improve mean AP; the small Brier difference does
+not demonstrate a meaningful advantage. Five-bin calibration shows some
+underprediction at the low end and overprediction at the high end, not verified
+clinical probability accuracy. Full results and interpretation are recorded in
+the [review report](../Data%20and%20code%20review%20and%20preparation.md).
+
+## Youden operating point and frozen research pipeline
+
+After retaining fixed `C=1`, run:
+
+```bash
+python -m src.mortality_operating_point
+```
+
+Only the existing development NPZ is loaded. The original notebook, test
+exchange, full audit dataset and PostgreSQL are not used. Five outer grouped
+folds use seed 42. For each outer training pool, three inner grouped folds
+use seed `42 + outer_fold_number` and refit the complete `C=1` pipeline.
+Their internal OOF probabilities select Youden's threshold; ties select the
+highest finite threshold. The pipeline is then refitted on the outer training
+pool and the threshold applied unchanged to the outer validation patients.
+The decision rule is `probability >= threshold`.
+
+The report includes sensitivity, specificity, precision (positive predictive
+value), negative predictive value, alert count/alerts per 100 admissions,
+accuracy and confusion matrices. It also retains AP, AUROC and Brier.
+Undefined predictive values are `null` with an explicit reason.
+Fold means/SDs and pooled counts are reported separately: pooled decisions
+come from different fold-specific thresholds, not one universal cutoff.
+Fold SDs are descriptive, not confidence intervals.
+
+After that evaluation, Youden on the full development pool's five-fold OOF
+probabilities supplies a separate frozen threshold. A final `C=1` pipeline
+is fitted using all development admissions. **No performance is estimated
+for this full-data fitted artifact.** Its threshold is transferred from
+cross-fitted models, whose probability distributions may differ; it is not
+a validated clinical intervention cutoff. No added calibration or further
+regularization/feature search is performed.
+
+The private, non-overwriting output directory
+`outputs/mortality-development/frozen-logistic/` contains:
+
+- `evaluation.json`: aggregate outer-fold evaluation and provenance.
+- `model.joblib`: fitted imputer, missingness indicators, standard scaler and
+  logistic regression, with no stored input rows or individual predictions.
+- `model_spec.json`: frozen threshold, marker/feature order, units, transformed
+  coefficients/intercept, classifier configuration, package versions and hashes.
+  Coefficients describe standardized features, not raw-unit or causal effects.
+
+The input contract for later research scoring is `(admissions, 10, 3)` in
+physical units, with `NaN` for originally unmeasured bins, ordered lactate,
+total bilirubin, creatinine. Do not pass six-channel scaled AE inputs or
+forward-filled values. This interface does not extract events, check source
+units or assess clinical plausibility.
+
+Load joblib files **only from a trusted source** in a compatible environment;
+deserialization can execute code. A synthetic reload example is:
+
+```python
+import json
+from pathlib import Path
+import joblib
+import numpy as np
+from src.mortality_operating_point import predict_observed
+
+directory = Path("outputs/mortality-development/frozen-logistic")
+spec = json.loads((directory / "model_spec.json").read_text())
+model = joblib.load(directory / "model.joblib")
+synthetic_bins = np.ones((1, 10, 3), dtype=float)
+probabilities, flags = predict_observed(model, synthetic_bins, spec["threshold"])
+```
+
+The export verifies reload agreement using synthetic inputs only; it does not
+score real development rows with the final full-data fit. Model and threshold
+remain research artifacts requiring independent confirmation.
+
+The full local evaluation and freeze are complete; **no Colab rerun is needed**.
+Pooled outer sensitivity/specificity were 47.77%/80.48%, PPV/NPV 18.80%/94.22%,
+with 21.96 alerts per 100 admissions and confusion matrix
+`[[1336, 324], [82, 75]]`. Missing 82 of 157 death admissions is a major
+limitation, not a clinically acceptable rule-out claim. The separate frozen
+cutoff is 0.07646250931594001; these pooled rates belong to the five different
+internally selected outer-fold thresholds, **not the frozen model/cutoff**.
+See the [review report](../Data%20and%20code%20review%20and%20preparation.md) for
+the full interpretation and next confirmation gate.
+
+## Improving the autoencoder as the main method
+
+The autoencoder LSTM remains the main article-related method. Logistic
+regression is only a supervised comparator; its frozen artifact does not
+replace the LSTM experiment.
+
+The bounded development study runs with:
+
+```bash
+python -m src.mortality_autoencoder_study
+```
+
+It uses the same development-only NPZ; no new export or database connection
+is needed. CPU is sufficient, though this repeated training takes longer than
+the logistic comparisons. The CLI limits PyTorch to two CPU threads.
+`--device cuda` requests an available GPU; unavailable CUDA is reported and
+CPU used explicitly. No dependencies or source clinical files are added.
+
+The prespecified grid isolates three changes:
+
+| Candidate | Observed-value transform | Fitting admissions | Epochs |
+|---|---|---|---:|
+| baseline | Identity | All | 10 |
+| log | `log1p` | All | 10 |
+| log_long | `log1p` | All | 30 |
+| log_long_survivors | `log1p` | Survivors only | 30 |
+
+Observed biomarkers in this development pool are nonnegative and skewed.
+`log1p` accepts recorded zero values and preserves NaN gaps; negative values
+raise an error, never get clipped. After transformation, each fitting population
+independently fits initial-gap medians and min-max scaling; forward-fill uses
+past values only, and original observation masks remain inputs.
+
+The 64/32 encoder, 32/64 decoder, observed-only MSE, observed-only MAE score,
+Adam learning rate 0.0001, batch size 32 and gradient clipping remain unchanged.
+High anomaly error always means higher candidate risk. Thirty epochs and the
+log transform are explicit experimental deviations from the original protocol,
+not recovered article settings.
+
+Five outer patient-grouped stratified folds use seed 42. Within each outer
+training pool, three grouped folds (split seed `42 + outer_fold_number`) select
+a candidate by mean mortality AP. Exact ties retain the earliest grid entry.
+Inner training seed is `42 + 100 * outer_fold_number + inner_fold_number`,
+shared across candidates; outer training seed is `42 + outer_fold_number`,
+matching the earlier fixed AE baseline. Every model uses its fixed epochs,
+never outer-fold loss for checkpointing. Mortality labels guide candidate
+selection and survivor eligibility, **not reconstruction gradients**.
+
+Selected candidates are refitted on outer training patients and compared with
+the unchanged baseline on the same held-out patients. Report AP/AUROC fold
+means and SDs only: anomaly scores from different transforms/fitted scales are
+not pooled. Fold SDs are not confidence intervals. These are exploratory
+development estimates, not independent confirmation or calibrated probabilities.
+
+Private outputs in `outputs/mortality-development/autoencoder-study/` are
+`study.json`, `comparison.png` and `training.log`. No individual scores or
+identifiers, new operating threshold, final model or model weights are exported
+in this study. Review the measured comparison before a separate model freeze.
+The loader rejects full/test exchanges, outputs never overwrite an existing
+directory, and the original test-evaluating notebook must not be rerun.
+
+The full local study is complete: baseline was selected in four outer folds,
+and `log_long_survivors` in one. Mean AP/AUROC were 0.2139/0.6162 for the nested
+selection procedure versus 0.2151/0.6217 for the unchanged AE. **No improvement
+was observed from this bounded search**, so no new AE variant was adopted or
+frozen. The baseline reproduces the earlier AE development metrics exactly.
+The LSTM remains the main method; this result does not promote logistic
+regression into its place. **No Colab rerun is necessary.** See the
+[review report](../Data%20and%20code%20review%20and%20preparation.md) for limitations
+and the next investigation gate.
+
+## Auditing temporal information without training
+
+Run the descriptive audit using only the existing development NPZ:
+
+```bash
+python -m src.mortality_temporal_audit
+```
+
+Private, non-overwriting outputs under
+`outputs/mortality-development/temporal-audit/` are `temporal_audit.json` and
+`temporal_coverage.png`. The audit counts observed cells per bin, repeated
+and numerically varying measurements per marker, adjacent/occupied-bin pairs,
+bin-distance intervals and the positions that would require forward-fill or
+training-median imputation. It does not fit preprocessing, train models, select
+thresholds, read test arrays or access PostgreSQL. Only aggregates are saved;
+original event times and multiple events within a bin are unavailable.
+
+The full local audit is complete: only 20.21% of biomarker positions are
+originally observed, 55.63% require forward-fill and 24.16% initial median fill.
+The median admission has six observed marker cells spread across three
+occupied bins (not six distinct blood draws). Repeated measurements in at
+least two bins occur for lactate in 67.86%, bilirubin in 89.27%, and creatinine
+in 4.35% of admissions. All three repeat in only 3.80%.
+
+The loss/score still exclude imputed targets; masks already distinguish
+observations from fills. These findings indicate limited/irregular temporal
+coverage, not a proven cause of weak discrimination. The next suggested
+experiment is a prespecified temporal-order ablation, **not performed here**,
+before more hyperparameter search. The LSTM remains the main method.
+See the [review report](../Data%20and%20code%20review%20and%20preparation.md) for
+definitions, outcome-stratified descriptions and limitations.
+**No Colab rerun is necessary for this audit.**
+
 ## Troubleshooting
 
 - **Missing path or permission:** verify Drive was mounted with the correct

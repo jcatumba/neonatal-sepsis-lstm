@@ -72,23 +72,29 @@ class MortalityConfig:
         return torch.device("cpu")
 
 
-def train_autoencoder(train_x: np.ndarray, validation_x: np.ndarray,
+def train_autoencoder(train_x: np.ndarray, validation_x: np.ndarray | None,
                       config: MortalityConfig) -> tuple[MortalityAutoencoder, dict]:
+    """Train with validation checkpointing, or fixed epochs when validation is None."""
     set_seed(config.seed)
-    if not len(train_x) or not len(validation_x):
+    if not len(train_x) or (validation_x is not None and not len(validation_x)):
         raise ValueError("Training and validation data must be nonempty.")
     if config.device_preference == "cuda" and config.device.type == "cpu":
         print("CUDA unavailable; training on CPU.")
     device = config.device
     model = MortalityAutoencoder().to(device)
     generator = torch.Generator().manual_seed(config.seed)
+    inputs = [(train_x, True)]
+    if validation_x is not None:
+        inputs.append((validation_x, False))
     loaders = [
         DataLoader(TensorDataset(torch.from_numpy(x.astype(np.float32, copy=False))),
                    batch_size=config.batch_size, shuffle=shuffle, generator=generator)
-        for x, shuffle in ((train_x, True), (validation_x, False))
+        for x, shuffle in inputs
     ]
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
-    history = {"train_loss": [], "validation_loss": []}
+    history = {"train_loss": []}
+    if validation_x is not None:
+        history["validation_loss"] = []
     best_loss = float("inf")
     best_state = None
     for epoch in range(min(config.epochs, 2) if config.fast_dev_run else config.epochs):
@@ -109,12 +115,16 @@ def train_autoencoder(train_x: np.ndarray, validation_x: np.ndarray,
                         optimizer.step()
                     total += loss.item() * len(batch)
             history[key].append(total / len(loader.dataset))
-        current = history["validation_loss"][-1]
-        if current < best_loss:
-            best_loss, best_state = current, deepcopy(model.state_dict())
-        print(f"Epoch {epoch + 1}: train={history['train_loss'][-1]:.6f}, validation={current:.6f}")
-    if best_state is None:
-        raise RuntimeError("No valid model checkpoint was produced.")
-    model.load_state_dict(best_state)
+        message = f"Epoch {epoch + 1}: train={history['train_loss'][-1]:.6f}"
+        if validation_x is not None:
+            current = history["validation_loss"][-1]
+            if current < best_loss:
+                best_loss, best_state = current, deepcopy(model.state_dict())
+            message += f", validation={current:.6f}"
+        print(message)
+    if validation_x is not None:
+        if best_state is None:
+            raise RuntimeError("No valid model checkpoint was produced.")
+        model.load_state_dict(best_state)
     model.eval()
     return model, history

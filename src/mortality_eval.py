@@ -35,7 +35,7 @@ def youden_threshold(labels: np.ndarray, scores: np.ndarray) -> float:
     return float(thresholds[finite][np.argmax((tpr - fpr)[finite])])
 
 
-def _metrics(labels: np.ndarray, scores: np.ndarray, threshold: float) -> dict:
+def _metrics(labels: np.ndarray, scores: np.ndarray, threshold: float | np.ndarray) -> dict:
     predicted = scores >= threshold
     positive = labels == 1
     tp = int((predicted & positive).sum())
@@ -51,6 +51,28 @@ def _metrics(labels: np.ndarray, scores: np.ndarray, threshold: float) -> dict:
         "accuracy": (tp + tn) / len(labels),
         "confusion_matrix": [[tn, fp], [fn, tp]],
     }
+
+
+def operating_metrics(labels: np.ndarray, scores: np.ndarray,
+                      threshold: float | np.ndarray) -> dict:
+    """Evaluate scalar or per-admission thresholds, including alert burden."""
+    boundary = np.asarray(threshold)
+    if (labels.ndim != 1 or scores.shape != labels.shape
+            or set(np.unique(labels)) != {0, 1} or not np.isfinite(scores).all()
+            or boundary.shape not in ((), labels.shape) or not np.isfinite(boundary).all()):
+        raise ValueError("Binary labels, finite scores and scalar or aligned thresholds are required.")
+    result = _metrics(labels, scores, threshold)
+    tn, fp = result["confusion_matrix"][0]
+    fn, tp = result["confusion_matrix"][1]
+    result["negative_predictive_value"] = tn / (tn + fn) if tn + fn else None
+    result["alert_count"] = tp + fp
+    result["alerts_per_100"] = 100 * (tp + fp) / len(labels)
+    result["undefined_metrics"] = {}
+    if result["precision"] is None:
+        result["undefined_metrics"]["precision"] = "No positive predictions."
+    if result["negative_predictive_value"] is None:
+        result["undefined_metrics"]["negative_predictive_value"] = "No negative predictions."
+    return result
 
 
 def evaluate_mortality(validation_y: np.ndarray, validation_scores: np.ndarray,
